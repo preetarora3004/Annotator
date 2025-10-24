@@ -1,2 +1,7 @@
 /* Component-level styles for the UI package */
-@import "tailwindcss" prefix(ui);
+@import "tailwindcss";
+
+@theme {
+    --color-hover : #F1F0FF
+    --color-bg : #E0DFFF;
+}
