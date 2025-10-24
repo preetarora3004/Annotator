@@ -13,6 +13,12 @@
     "prettier-plugin-tailwindcss": "^0.6.11",
     "turbo": "^2.5.8"
   },
+  "dependencies": {
+    "@repo/db": "workspace:*",
+    "@repo/ui": "workspace:*",
+    "@repo/utils": "workspace:*",
+    "next-auth": "^4.24.11"
+  },
   "packageManager": "pnpm@8.15.6",
   "engines": {
     "node": ">=18"
