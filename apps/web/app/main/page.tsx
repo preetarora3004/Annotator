@@ -1,7 +1,7 @@
 "use client"
 
-import { Canvas, PencilBrush, Rect, Circle, Path, TEvent, TPointerEventInfo, Point } from "fabric";
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Canvas, PencilBrush, Rect, Circle, Path, TEvent, TPointerEventInfo, Point, FabricObject } from "fabric";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSession } from "next-auth/react";
 import { LoaderIcon } from "lucide-react";
 import { useProps } from "@repo/ui/store";
@@ -13,18 +13,17 @@ import { Line } from "@repo/ui/line";
 import { shallow } from "zustand/shallow";
 import { Menu } from '@repo/ui/menu';
 import { useSocket } from "@repo/ui/websocketProvider";
+import { y, WebsocketProvider } from '@repo/utils'
 
 export default function Canva() {
 
-    const { status } = useSession();
+    const { data, status } = useSession();
 
     useEffect(() => {
         if (status === 'authenticated') {
             return;
         }
-        else {
-            <LoaderIcon />
-        }
+        // Handle unauthenticated state if needed
     }, [status])
 
     const { tool, activeTool } = useProps((s) => ({ tool: s.tool, activeTool: s.activeTool }), shallow)
@@ -38,6 +37,26 @@ export default function Canva() {
     const activeShape = useRef<Rect | Circle | null>(null);
     const previewShapes = useRef<Map<string, Rect | Circle>>(new Map());
     const { socket, send } = useSocket();
+
+    const { doc, provider, objects, awareness } = useMemo(() => {
+
+        if (!data?.user) return { doc: null, provider: null, awareness: null, objects: null };
+
+        const yDoc = new y.Doc();
+        const yArray = yDoc.getArray<y.Map<any>>("canvas-object")
+        const provider = new WebsocketProvider(`ws://localhost:8080/?token=${data.user.token}`, 'y-doc', yDoc);
+        const awareness = provider.awareness;
+
+        return { doc: yDoc, provider, objects: yArray, awareness };
+
+    }, [data?.user])
+
+    useEffect(() => {
+        return () => {
+            doc?.destroy();
+            provider?.destroy();
+        }
+    }, [doc, provider])
 
     useEffect(() => {
         if (!canvasEl.current) return;
@@ -61,7 +80,7 @@ export default function Canva() {
 
     useEffect(() => {
         setActive(activeTool)
-    }, [tool])
+    }, [activeTool])
 
     const onMouseScroll = useCallback((o: TPointerEventInfo<WheelEvent>) => {
 
@@ -113,14 +132,14 @@ export default function Canva() {
             ? new Rect({ ...shapeOptions, width: 0, height: 0 })
             : new Circle({ ...shapeOptions, radius: 0 });
 
-        const shapeId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+        const shapeId = Date.now().toString() + Math.random().toString(36).substring(2, 11);
         shape.set('id', shapeId);
         shape.set('isPreview', true);
         activeShape.current = shape;
-        
+
         // Add preview shape to canvas but mark it as preview
         canvas.add(shape);
-        
+
         // Send preview start event to other users
         send("preview:start", {
             type: tool === 'rectangle' ? 'rect' : 'circle',
@@ -134,14 +153,14 @@ export default function Canva() {
             fill: shape.fill || 'transparent',
             id: shapeId,
             rx: 20,
-            ry : 20
+            ry: 20
         });
     }, [canvas, tool, send]);
 
     const onMouseMove = useCallback((o: TEvent) => {
         if (!isDrawingShape.current || !activeShape.current || !canvas) return;
         const pointer = canvas.getScenePoint(o.e);
-        
+
         if (activeShape.current.type === 'rect') {
             const rect = activeShape.current as Rect;
             if (startPoint.current.x > pointer.x) rect.set({ left: pointer.x });
@@ -150,7 +169,7 @@ export default function Canva() {
                 width: Math.abs(startPoint.current.x - pointer.x),
                 height: Math.abs(startPoint.current.y - pointer.y),
             });
-            
+
             // Send preview update to other users
             send("preview:move", {
                 type: 'rect',
@@ -166,7 +185,7 @@ export default function Canva() {
                 id: rect.get('id')
             });
         }
-        
+
         if (activeShape.current.type === 'circle') {
             const circle = activeShape.current as Circle;
             circle.set({
@@ -174,7 +193,7 @@ export default function Canva() {
                 top: Math.min(pointer.y, startPoint.current.y),
                 radius: Math.max(Math.abs(startPoint.current.x - pointer.x), Math.abs(startPoint.current.y - pointer.y)) / 2
             });
-            
+
             // Send preview update to other users
             send("preview:move", {
                 type: 'circle',
@@ -191,79 +210,96 @@ export default function Canva() {
     }, [canvas, send]);
 
     const onMouseUp = useCallback(() => {
-        if (activeShape.current) {
-            // Convert preview shape to permanent shape
-            activeShape.current.set({ 
-                hasControls: true, 
-                selectable: true,
-                isPreview: false 
-            });
 
-            try {
-                if (activeShape.current.type === 'rect') {
-                    const rect = activeShape.current as Rect;
-                    send("object:added", {
-                        type: 'rect',
-                        left: rect.left || 0,
-                        top: rect.top || 0,
-                        width: rect.width || 0,
-                        height: rect.height || 0,
-                        stroke: rect.stroke || 'black',
-                        strokeWidth: rect.strokeWidth || 2,
-                        fill: rect.fill || 'transparent',
-                        selectable: true,
-                        hasControls: true,
-                        rx: rect.rx || 20,
-                        ry: rect.ry || 20,
-                        id: rect.get('id')
-                    });
-                } else if (activeShape.current.type === 'circle') {
-                    const circle = activeShape.current as Circle;
-                    send("object:added", {
-                        type: 'circle',
-                        left: circle.left || 0,
-                        top: circle.top || 0,
-                        radius: circle.radius || 0,
-                        stroke: circle.stroke || 'black',
-                        strokeWidth: circle.strokeWidth || 2,
-                        fill: circle.fill || 'transparent',
-                        selectable: true,
-                        hasControls: true,
-                        id: circle.get('id')
-                    });
-                }
-                
-                // Send preview end event to clean up preview shapes on other clients
-                send("preview:end", {
-                    id: activeShape.current.get('id')
-                });
-            } catch (err) {
-                console.log("Error sending object:", err);
+        if (!doc || !objects || !activeShape.current) return;
+
+        // Convert preview shape to permanent shape
+
+        activeShape.current.set({
+            hasControls: true,
+            selectable: true,
+            isPreview: false
+        });
+
+        const shape = activeShape.current;
+
+        const newYObjects = new y.Map();
+
+        doc.transact(() => {
+            newYObjects.set("id", shape.get("id"));
+            newYObjects.set("left", shape.left);
+            newYObjects.set("top", shape.top);
+            newYObjects.set("stroke", shape.stroke || 'black');
+            newYObjects.set("strokeWidth", shape.strokeWidth || 2);
+            newYObjects.set("fill", shape.fill || 'transparent');
+
+            if (shape.type === 'rect') {
+                newYObjects.set("width", (shape as Rect).width);
+                newYObjects.set("height", (shape as Rect).height);
+                newYObjects.set("rx", (shape as Rect).rx || 20);
+                newYObjects.set("ry", (shape as Rect).ry || 20);
             }
-        }
-        isDrawingShape.current = false;
-        activeShape.current = null;
-        canvas?.renderAll();
-    }, [canvas, send]);
+            else if (shape.type === 'circle') {
+                newYObjects.set("radius", (shape as Circle).radius || 0);
+            }
 
-    // Cleanup preview shapes when switching tools
-    const cleanupPreviewShapes = useCallback(() => {
-        if (activeShape.current && activeShape.current.get('isPreview')) {
-            // canvas?.remove(activeShape.current);
-            send("preview:end", {
-                id: activeShape.current.get('id')
-            });
-        }
-        previewShapes.current.clear();
+            objects.push([newYObjects]);
+        })
+
+        // canvas?.remove(shape);
+
+        // Send preview end event to clean up preview shapes on other clients
+        send("preview:end", {
+            id: activeShape.current.get('id')
+        });
+
         isDrawingShape.current = false;
         activeShape.current = null;
-    }, [canvas, send]);
+
+    }, [canvas, doc, objects, send]);
+
+    useEffect(() => {
+
+        if (!canvas || !objects) return;
+
+        canvas.isDrawingMode = false;
+
+        const yjsObservation = (event: y.YArrayEvent<y.Map<any>>) => {
+            event.changes.added.forEach((item) => {
+                item.content.getContent().forEach((yMap: y.Map<any>) => {
+                    const objData = yMap.toJSON();
+
+                    let fabricObjData: FabricObject | null = null;
+
+                    if (objData.type === "rect") {
+                        fabricObjData = new Rect(objData);
+                    }
+                    else if (objData.type === "circle") {
+                        fabricObjData = new Circle(objData);
+                    }
+
+                    if(fabricObjData)
+                    {
+                        canvas.add(fabricObjData);
+                    }
+
+                })
+            })
+
+            canvas.renderAll();
+        }
+
+        objects.observe(yjsObservation);
+
+        return ()=>
+        {
+            objects.unobserve(yjsObservation);
+        }
+
+    },[canvas, objects]);
 
     useEffect(() => {
         if (!canvas) return;
-
-        // Clean up any existing preview shapes when switching tools
-        // cleanupPreviewShapes();
 
         canvas.isDrawingMode = false;
         canvas.selection = true;
@@ -339,7 +375,7 @@ export default function Canva() {
                     const path = e.path;
                     if (path) {
                         // Add unique ID to the path
-                        path.set('id', Date.now().toString() + Math.random().toString(36).substr(2, 9));
+                        path.set('id', Date.now().toString() + Math.random().toString(36).substring(2, 11));
                         try {
                             send("path:added", {
                                 type: 'path',
@@ -459,7 +495,7 @@ export default function Canva() {
                 } else if (data.action === "preview:start") {
                     const payload = data.payload;
                     let previewShape: Rect | Circle;
-                    
+
                     if (payload.type === 'rect') {
                         previewShape = new Rect({
                             left: payload.left,
@@ -488,7 +524,7 @@ export default function Canva() {
                     } else {
                         return;
                     }
-                    
+
                     if (payload.id) {
                         previewShape.set('id', payload.id);
                         previewShape.set('isPreview', true);
@@ -498,7 +534,7 @@ export default function Canva() {
                 } else if (data.action === "preview:move") {
                     const payload = data.payload;
                     const existingPreview = previewShapes.current.get(payload.id);
-                    
+
                     if (existingPreview) {
                         if (payload.type === 'rect') {
                             (existingPreview as Rect).set({
@@ -536,7 +572,7 @@ export default function Canva() {
             socket.removeEventListener("message", handleMessage);
         }
 
-    }, [socket, canvas])
+    }, [socket, canvas, send])
 
     useEffect(() => {
         if (!canvas) return;
