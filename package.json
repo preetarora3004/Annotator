@@ -17,7 +17,9 @@
     "@repo/db": "workspace:*",
     "@repo/ui": "workspace:*",
     "@repo/utils": "workspace:*",
-    "next-auth": "^4.24.11"
+    "next-auth": "^4.24.11",
+    "y-websocket": "^3.0.0",
+    "yjs": "^13.6.27"
   },
   "packageManager": "pnpm@8.15.6",
   "engines": {

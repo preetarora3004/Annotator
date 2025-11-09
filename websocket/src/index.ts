@@ -64,7 +64,10 @@ wss.on("connection", async (socket: WebSocket, req: IncomingMessage) => {
 
   users.set(tokenFromQuery, socket);
 
-  socket.on("message", async (data: WebSocket.RawData) => {
+  socket.on("message", async (data: WebSocket.RawData, isBinary) => {
+
+    if(isBinary) return;
+
     try {
       const message: Message = JSON.parse(data.toString());
       broadcast(message, tokenFromQuery);
