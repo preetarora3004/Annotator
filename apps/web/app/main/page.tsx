@@ -3,7 +3,6 @@
 import { Canvas, PencilBrush, Rect, Circle, Path, TEvent, TPointerEventInfo, Point, FabricObject } from "fabric";
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSession } from "next-auth/react";
-import { LoaderIcon } from "lucide-react";
 import { useProps } from "@repo/ui/store";
 import { Circles } from '@repo/ui/circle';
 import { Rectangle } from "@repo/ui/rectangle";
@@ -23,10 +22,9 @@ export default function Canva() {
         if (status === 'authenticated') {
             return;
         }
-        // Handle unauthenticated state if needed
     }, [status])
 
-    const { tool, activeTool } = useProps((s) => ({ tool: s.tool, activeTool: s.activeTool }), shallow)
+    const { tool, activeTool } = useProps((s) => ({ tool: s.tool, activeTool: s.activeTool }), shallow);
     const [active, setActive] = useState("select");
 
     const [canvas, setCanvas] = useState<Canvas | null>(null);
@@ -37,13 +35,14 @@ export default function Canva() {
     const activeShape = useRef<Rect | Circle | null>(null);
     const previewShapes = useRef<Map<string, Rect | Circle>>(new Map());
     const { socket, send } = useSocket();
+    const cursor = useRef<Map<number, { x: number, y: number, name: string, color: string }>>(null);
 
     const { doc, provider, objects, awareness } = useMemo(() => {
 
         if (!data?.user) return { doc: null, provider: null, awareness: null, objects: null };
 
         const yDoc = new y.Doc();
-        const yArray = yDoc.getArray<y.Map<any>>("canvas-object")
+        const yArray = yDoc.getArray<y.Map<any>>("canvas-object");
         const provider = new WebsocketProvider(`ws://localhost:8080/?token=${data.user.token}`, 'y-doc', yDoc);
         const awareness = provider.awareness;
 
@@ -113,6 +112,56 @@ export default function Canva() {
         }
 
     }, [canvas, onMouseScroll])
+
+    useEffect(() => {
+
+        if (!awareness || !canvas) return;
+
+        const handleAwarenessChanges = () => {
+
+            const localId = awareness.clientID;
+            const newCursor = new Map<number, { x: number, y: number, name: string, color: string }>();
+            const states = awareness.getStates();
+
+            states.forEach((value, clientId) => {
+
+                if (localId !== clientId && value && value.cursor) {
+                    newCursor.set(clientId, {
+                        x: value.cursor.x,
+                        y: value.cursor.y,
+                        name: value.cursor.name,
+                        color: value.cursor.color
+                    })
+                }
+            })
+            cursor.current = newCursor;
+        }
+
+        awareness.on("change", handleAwarenessChanges);
+
+        return () => {
+            awareness.off("change", handleAwarenessChanges);
+        }
+
+    }, [data?.user, awareness]);
+
+    const mouseMove = useCallback((o: TEvent) => {
+
+        if (!canvas || !awareness || !data || !data.user) return;
+
+        const pointer = canvas.getScenePoint(o.e);
+
+        if (awareness) {
+            awareness.setLocalStateField("cursor", {
+
+                name: data.user.username,
+                x: pointer.x,
+                y: pointer.y,
+                color: "#000000"
+            })
+        }
+
+    }, [canvas, tool])
 
     const onMouseDown = useCallback((o: TEvent) => {
         if (!canvas) return;
@@ -278,8 +327,7 @@ export default function Canva() {
                         fabricObjData = new Circle(objData);
                     }
 
-                    if(fabricObjData)
-                    {
+                    if (fabricObjData) {
                         canvas.add(fabricObjData);
                     }
 
@@ -291,12 +339,11 @@ export default function Canva() {
 
         objects.observe(yjsObservation);
 
-        return ()=>
-        {
+        return () => {
             objects.unobserve(yjsObservation);
         }
 
-    },[canvas, objects]);
+    }, [canvas, objects]);
 
     useEffect(() => {
         if (!canvas) return;
@@ -355,6 +402,7 @@ export default function Canva() {
         canvas.off('mouse:down', onMouseDown);
         canvas.off('mouse:move', onMouseMove);
         canvas.off('mouse:up', onMouseUp);
+        canvas.off("mouse:move", mouseMove);
 
 
         switch (tool) {
@@ -406,6 +454,7 @@ export default function Canva() {
 
                 canvas.on('mouse:down', onMouseDown);
                 canvas.on('mouse:move', onMouseMove);
+                canvas.on("mouse:move", mouseMove);
                 canvas.on('mouse:up', onMouseUp);
                 break;
         }
