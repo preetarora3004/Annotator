@@ -12,7 +12,7 @@ import { Line } from "@repo/ui/line";
 import { shallow } from "zustand/shallow";
 import { Menu } from '@repo/ui/menu';
 import { useSocket } from "@repo/ui/websocketProvider";
-import { y, WebsocketProvider } from '@repo/utils'
+import { y, WebsocketProvider, IndexeddbPersistence } from '@repo/utils'
 
 export default function Canva() {
 
@@ -35,27 +35,30 @@ export default function Canva() {
     const activeShape = useRef<Rect | Circle | null>(null);
     const previewShapes = useRef<Map<string, Rect | Circle>>(new Map());
     const { socket, send } = useSocket();
-    const cursor = useRef<Map<number, { x: number, y: number, name: string, color: string }>>(null);
+    const [cursors, setCursors] = useState<Map<number, { x: number, y: number, name: string, color: string }>>(new Map());
+    const cursorObjects = useRef<Map<number, Circle>>(new Map());
 
-    const { doc, provider, objects, awareness } = useMemo(() => {
+    const { doc, provider, objects, awareness, indexDb } = useMemo(() => {
 
         if (!data?.user) return { doc: null, provider: null, awareness: null, objects: null };
 
         const yDoc = new y.Doc();
         const yArray = yDoc.getArray<y.Map<any>>("canvas-object");
-        const provider = new WebsocketProvider(`ws://localhost:8080/?token=${data.user.token}`, 'y-doc', yDoc);
+        const provider = new WebsocketProvider(`ws://localhost:8080/?token=${data.user.token}`, 'y-canvas', yDoc);
         const awareness = provider.awareness;
+        const indexDb = new IndexeddbPersistence('y-canvas', yDoc);
 
-        return { doc: yDoc, provider, objects: yArray, awareness };
+        return { doc: yDoc, provider, objects: yArray, awareness, indexDb };
 
     }, [data?.user])
 
     useEffect(() => {
         return () => {
-            doc?.destroy();
+            indexDb?.destroy();
             provider?.destroy();
+            doc?.destroy();
         }
-    }, [doc, provider])
+    }, [doc, provider, indexDb])
 
     useEffect(() => {
         if (!canvasEl.current) return;
@@ -113,6 +116,28 @@ export default function Canva() {
 
     }, [canvas, onMouseScroll])
 
+    useEffect(()=>{
+
+        if(!indexDb || !data?.user) return;
+
+        const handleSynced = () => {
+            console.log("IndexedDB synced - data loaded from local storage");
+        }
+
+        indexDb.on('synced', handleSynced);
+
+        indexDb.whenSynced.then(() => {
+            console.log("IndexedDB ready");
+        }).catch((err) => {
+            console.error("IndexedDB sync error:", err);
+        });
+
+        return () => {
+            indexDb.off('synced', handleSynced);
+        }
+
+    },[data?.user, indexDb]);
+
     useEffect(() => {
 
         if (!awareness || !canvas) return;
@@ -120,13 +145,12 @@ export default function Canva() {
         const handleAwarenessChanges = () => {
 
             const localId = awareness.clientID;
-            const newCursor = new Map<number, { x: number, y: number, name: string, color: string }>();
+            const newCursors = new Map<number, { x: number, y: number, name: string, color: string }>();
             const states = awareness.getStates();
 
             states.forEach((value, clientId) => {
-
                 if (localId !== clientId && value && value.cursor) {
-                    newCursor.set(clientId, {
+                    newCursors.set(clientId, {
                         x: value.cursor.x,
                         y: value.cursor.y,
                         name: value.cursor.name,
@@ -134,16 +158,64 @@ export default function Canva() {
                     })
                 }
             })
-            cursor.current = newCursor;
+
+            const currentClientIds = new Set(newCursors.keys());
+            cursorObjects.current.forEach((cursorObj, clientId) => {
+                if (!currentClientIds.has(clientId)) {
+                    canvas.remove(cursorObj);
+                    cursorObjects.current.delete(clientId);
+                }
+            });
+
+            newCursors.forEach((cursorData, clientId) => {
+                let cursorObj = cursorObjects.current.get(clientId);
+                
+                if (!cursorObj) {
+                
+                    cursorObj = new Circle({
+                        left: cursorData.x,
+                        top: cursorData.y,
+                        radius: 8,
+                        fill: cursorData.color,
+                        stroke: '#ffffff',
+                        strokeWidth: 2,
+                        selectable: false,
+                        evented: false,
+                        hasControls: false,
+                        hasBorders: false,
+                        originX: 'center',
+                        originY: 'center',
+                    });
+                    cursorObj.set('isCursor', true);
+                    cursorObj.set('clientId', clientId);
+                    canvas.add(cursorObj);
+                    canvas.sendObjectToBack(cursorObj);
+                    cursorObjects.current.set(clientId, cursorObj);
+                } else {
+                    
+                    cursorObj.set({
+                        left: cursorData.x,
+                        top: cursorData.y,
+                        fill: cursorData.color,
+                    });
+                }
+            });
+
+            setCursors(newCursors);
+            canvas.renderAll();
         }
 
         awareness.on("change", handleAwarenessChanges);
 
         return () => {
             awareness.off("change", handleAwarenessChanges);
+            cursorObjects.current.forEach((cursorObj) => {
+                canvas.remove(cursorObj);
+            });
+            cursorObjects.current.clear();
         }
 
-    }, [data?.user, awareness]);
+    }, [awareness, canvas]);
 
     const mouseMove = useCallback((o: TEvent) => {
 
@@ -151,17 +223,14 @@ export default function Canva() {
 
         const pointer = canvas.getScenePoint(o.e);
 
-        if (awareness) {
-            awareness.setLocalStateField("cursor", {
+        awareness.setLocalStateField("cursor", {
+            name: data.user.username,
+            x: pointer.x,
+            y: pointer.y,
+            color: "#D3D3D3" 
+        });
 
-                name: data.user.username,
-                x: pointer.x,
-                y: pointer.y,
-                color: "#000000"
-            })
-        }
-
-    }, [canvas, tool])
+    }, [canvas, awareness, data])
 
     const onMouseDown = useCallback((o: TEvent) => {
         if (!canvas) return;
@@ -186,10 +255,8 @@ export default function Canva() {
         shape.set('isPreview', true);
         activeShape.current = shape;
 
-        // Add preview shape to canvas but mark it as preview
         canvas.add(shape);
 
-        // Send preview start event to other users
         send("preview:start", {
             type: tool === 'rectangle' ? 'rect' : 'circle',
             left: shape.left || 0,
@@ -219,7 +286,6 @@ export default function Canva() {
                 height: Math.abs(startPoint.current.y - pointer.y),
             });
 
-            // Send preview update to other users
             send("preview:move", {
                 type: 'rect',
                 left: rect.left || 0,
@@ -243,7 +309,6 @@ export default function Canva() {
                 radius: Math.max(Math.abs(startPoint.current.x - pointer.x), Math.abs(startPoint.current.y - pointer.y)) / 2
             });
 
-            // Send preview update to other users
             send("preview:move", {
                 type: 'circle',
                 left: circle.left || 0,
@@ -261,8 +326,6 @@ export default function Canva() {
     const onMouseUp = useCallback(() => {
 
         if (!doc || !objects || !activeShape.current) return;
-
-        // Convert preview shape to permanent shape
 
         activeShape.current.set({
             hasControls: true,
@@ -295,9 +358,6 @@ export default function Canva() {
             objects.push([newYObjects]);
         })
 
-        // canvas?.remove(shape);
-
-        // Send preview end event to clean up preview shapes on other clients
         send("preview:end", {
             id: activeShape.current.get('id')
         });
@@ -404,6 +464,7 @@ export default function Canva() {
         canvas.off('mouse:up', onMouseUp);
         canvas.off("mouse:move", mouseMove);
 
+        canvas.on("mouse:move", mouseMove);
 
         switch (tool) {
             case 'select':
@@ -418,11 +479,10 @@ export default function Canva() {
                 brush.color = '#000000';
                 canvas.freeDrawingCursor = 'crosshair';
 
-                // Add event listener for path creation
                 canvas.on('path:created', (e) => {
                     const path = e.path;
                     if (path) {
-                        // Add unique ID to the path
+
                         path.set('id', Date.now().toString() + Math.random().toString(36).substring(2, 11));
                         try {
                             send("path:added", {
@@ -454,8 +514,8 @@ export default function Canva() {
 
                 canvas.on('mouse:down', onMouseDown);
                 canvas.on('mouse:move', onMouseMove);
-                canvas.on("mouse:move", mouseMove);
                 canvas.on('mouse:up', onMouseUp);
+    
                 break;
         }
 
@@ -605,8 +665,7 @@ export default function Canva() {
                     const payload = data.payload;
                     const previewShape = previewShapes.current.get(payload.id);
                     if (previewShape) {
-                        // canvas.remove(previewShape);
-                        // previewShapes.current.delete(payload.id);
+                        
                         canvas.renderAll();
                     }
                 }

@@ -21,6 +21,9 @@
     "@next-auth/prisma-adapter": "^1.0.7",
     "@repo/db": "workspace:*",
     "jsonwebtoken": "^9.0.2",
-    "@repo/types" : "workspace:*"
+    "@repo/types" : "workspace:*",
+    "yjs": "^13.6.27",
+    "y-websocket": "^3.0.0",
+    "y-indexeddb": "^9.0.12"
   }
 }

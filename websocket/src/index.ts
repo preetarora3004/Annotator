@@ -13,6 +13,7 @@ const server = createServer(app);
 
 const wss = new WebSocketServer({ noServer: true });
 const users = new Map<string, WebSocket>();
+const allClients = new Map<string, { socket: WebSocket; isYjs: boolean }>();
 
 type Message = {
   action: "object:added" | "object:modified" | "object:deleted" | "path:added" | "object:move" | "object:start" | "preview:start" | "preview:move" | "preview:end";
@@ -43,6 +44,14 @@ const broadcast = async (data: Message, senderId: string) => {
   });
 };
 
+const broadcastYjs = (data: Buffer | ArrayBuffer, senderId: string) => {
+  allClients.forEach((clientInfo, id) => {
+    if (id !== senderId && clientInfo.isYjs && clientInfo.socket.readyState === WebSocket.OPEN) {
+      clientInfo.socket.send(data);
+    }
+  });
+};
+
 server.on("upgrade", (req, socket, head) => {
   try {
     wss.handleUpgrade(req, socket, head, (ws) => {
@@ -62,22 +71,49 @@ wss.on("connection", async (socket: WebSocket, req: IncomingMessage) => {
     return;
   }
 
+  let isYjsClient = false;
+  let hasReceivedBinary = false;
+
+  allClients.set(tokenFromQuery, { socket, isYjs: false });
   users.set(tokenFromQuery, socket);
 
   socket.on("message", async (data: WebSocket.RawData, isBinary) => {
-
-    if(isBinary) return;
-
-    try {
-      const message: Message = JSON.parse(data.toString());
-      broadcast(message, tokenFromQuery);
-    } catch (err) {
-      console.error("Invalid message:", err);
+    if (isBinary) {
+      
+      if (!hasReceivedBinary) {
+        hasReceivedBinary = true;
+        isYjsClient = true;
+        const clientInfo = allClients.get(tokenFromQuery);
+        if (clientInfo) {
+          clientInfo.isYjs = true;
+        }
+      }
+      
+      const buffer = Buffer.from(data as ArrayBuffer);
+      broadcastYjs(buffer, tokenFromQuery);
+    } else {
+  
+      try {
+        const text = data.toString();
+        
+        try {
+          const message: Message = JSON.parse(text);
+          
+          broadcast(message, tokenFromQuery);
+        } catch {
+          if (isYjsClient) {
+            broadcastYjs(Buffer.from(text), tokenFromQuery);
+          }
+        }
+      } catch (err) {
+        console.error("Error handling message:", err);
+      }
     }
   });
 
   socket.on("close", () => {
     users.delete(tokenFromQuery);
+    allClients.delete(tokenFromQuery);
   });
 });
 
