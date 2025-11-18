@@ -12,7 +12,7 @@ import { Line } from "@repo/ui/line";
 import { shallow } from "zustand/shallow";
 import { Menu } from '@repo/ui/menu';
 import { useSocket } from "@repo/ui/websocketProvider";
-import { y, WebsocketProvider, IndexeddbPersistence } from '@repo/utils'
+import { y, WebsocketProvider, IndexeddbPersistence, rs } from '@repo/utils';
 
 export default function Canva() {
 
@@ -22,13 +22,14 @@ export default function Canva() {
         if (status === 'authenticated') {
             return;
         }
-    }, [status])
+    }, [status]);
 
     const { tool, activeTool } = useProps((s) => ({ tool: s.tool, activeTool: s.activeTool }), shallow);
     const [active, setActive] = useState("select");
 
     const [canvas, setCanvas] = useState<Canvas | null>(null);
     const canvasEl = useRef<HTMLCanvasElement>(null);
+    const rc = useRef<ReturnType<typeof rs.canvas> | null>(null);
 
     const isDrawingShape = useRef(false);
     const startPoint = useRef({ x: 0, y: 0 });
@@ -50,7 +51,7 @@ export default function Canva() {
 
         return { doc: yDoc, provider, objects: yArray, awareness, indexDb };
 
-    }, [data?.user])
+    }, [data?.user]);
 
     useEffect(() => {
         return () => {
@@ -58,7 +59,7 @@ export default function Canva() {
             provider?.destroy();
             doc?.destroy();
         }
-    }, [doc, provider, indexDb])
+    }, [doc, provider, indexDb]);
 
     useEffect(() => {
         if (!canvasEl.current) return;
@@ -69,6 +70,7 @@ export default function Canva() {
             skipOffscreen: true,
         });
         setCanvas(fabricCanvas);
+        rc.current = rs.canvas(canvasEl.current);
         const handleResize = () => {
             fabricCanvas.setDimensions({ width: window.innerWidth, height: window.innerHeight });
             fabricCanvas.renderAll();
@@ -116,9 +118,9 @@ export default function Canva() {
 
     }, [canvas, onMouseScroll])
 
-    useEffect(()=>{
+    useEffect(() => {
 
-        if(!indexDb || !data?.user) return;
+        if (!indexDb || !data?.user) return;
 
         const handleSynced = () => {
             console.log("IndexedDB synced - data loaded from local storage");
@@ -136,7 +138,7 @@ export default function Canva() {
             indexDb.off('synced', handleSynced);
         }
 
-    },[data?.user, indexDb]);
+    }, [data?.user, indexDb]);
 
     useEffect(() => {
 
@@ -169,9 +171,9 @@ export default function Canva() {
 
             newCursors.forEach((cursorData, clientId) => {
                 let cursorObj = cursorObjects.current.get(clientId);
-                
+
                 if (!cursorObj) {
-                
+
                     cursorObj = new Circle({
                         left: cursorData.x,
                         top: cursorData.y,
@@ -192,7 +194,7 @@ export default function Canva() {
                     canvas.sendObjectToBack(cursorObj);
                     cursorObjects.current.set(clientId, cursorObj);
                 } else {
-                    
+
                     cursorObj.set({
                         left: cursorData.x,
                         top: cursorData.y,
@@ -227,7 +229,7 @@ export default function Canva() {
             name: data.user.username,
             x: pointer.x,
             y: pointer.y,
-            color: "#D3D3D3" 
+            color: "#D3D3D3"
         });
 
     }, [canvas, awareness, data])
@@ -515,7 +517,7 @@ export default function Canva() {
                 canvas.on('mouse:down', onMouseDown);
                 canvas.on('mouse:move', onMouseMove);
                 canvas.on('mouse:up', onMouseUp);
-    
+
                 break;
         }
 
@@ -665,7 +667,7 @@ export default function Canva() {
                     const payload = data.payload;
                     const previewShape = previewShapes.current.get(payload.id);
                     if (previewShape) {
-                        
+
                         canvas.renderAll();
                     }
                 }

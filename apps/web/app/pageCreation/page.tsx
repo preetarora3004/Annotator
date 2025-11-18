@@ -4,6 +4,10 @@ import { UseSessionOptions } from "next-auth/react"
 
 export default function PageCreation() {
 
-    
+    return(<div>
+
+        
+
+    </div>)
 
 }
