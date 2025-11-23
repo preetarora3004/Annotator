@@ -1,4 +1,3 @@
-import { RoughGenerator } from "roughjs/bin/generator";
 import type { OpSet, Drawable, Config } from "roughjs/bin/core";
 
 export const drawToContext = (

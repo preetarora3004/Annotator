@@ -1,4 +1,4 @@
-import { Rect, Circle, FabricObject } from 'fabric';
+import { Rect, Circle } from 'fabric';
 import { RoughGenerator } from 'roughjs/bin/generator';
 import { Options } from 'roughjs/bin/core';
 import { drawDrawable } from './shapes';
@@ -14,11 +14,11 @@ const getGenerator = (): RoughGenerator => {
 
 export class RoughRect extends Rect {
     private roughConfig: Options = {
-        roughness: 1,
+        roughness: 2,
         bowing: 1,
         fill: 'transparent',
         stroke: '#000000',
-        strokeWidth: 2,
+        strokeWidth: 10,
     };
 
     constructor(options?: any) {
@@ -90,7 +90,7 @@ export class RoughRect extends Rect {
 
 export class RoughCircle extends Circle {
     private roughConfig: Options = {
-        roughness: 1,
+        roughness: 2,
         bowing: 1,
         fill: 'transparent',
         stroke: '#000000',
@@ -121,7 +121,7 @@ export class RoughCircle extends Circle {
                 ...this.roughConfig,
                 ...(fillValue !== undefined && { fill: fillValue }),
                 stroke: (this.stroke as string) || '#000000',
-                strokeWidth: this.strokeWidth || 2,
+                strokeWidth: this.strokeWidth || 5,
             }
         );
 

@@ -241,14 +241,20 @@ export default function Canva() {
         const pointer = canvas.getScenePoint(o.e);
         startPoint.current = { x: pointer.x, y: pointer.y };
 
-        const shapeOptions = {
+        const shapeOptions = tool === 'rectangle' ? {
             left: startPoint.current.x, top: startPoint.current.y,
             stroke: 'black', strokeWidth: 2, fill: 'transparent',
             selectable: false,
             hasControls: false,
             rx: 20,
             ry: 20,
-        };
+        } :
+            {
+                left: startPoint.current.x, top: startPoint.current.y,
+                stroke: 'black', strokeWidth: 10, fill: 'transparent',
+                selectable: false,
+                hasControls: false
+            };
         const shape = tool === 'rectangle'
             ? new RoughRect({ ...shapeOptions, width: 0, height: 0 })
             : new RoughCircle({ ...shapeOptions, radius: 0 });

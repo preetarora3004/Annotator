@@ -1,5 +1,5 @@
 export const createCircleCursor = (size: number, color: string) => {
-    // We'll create an SVG string
+    
     const svg = `
       <svg
         width="${size + 4}"
@@ -18,7 +18,5 @@ export const createCircleCursor = (size: number, color: string) => {
       </svg>
     `;
 
-    // Encode the SVG for use in a URL and create the CSS string
-    // The offsets (size / 2 + 2) center the cursor on the pointer
     return `url('data:image/svg+xml;base64,${btoa(svg)}') ${size / 2 + 2} ${size / 2 + 2}, auto`;
 };
