@@ -32,11 +32,11 @@ model Canva {
 model Shapes {
   id       String @id @default(cuid())
   name     String
-  startX   String
-  startY   String
-  width    Int?
-  height   Int?
-  radius   Int?
+  startX   Float
+  startY   Float
+  width    Float?
+  height   Float?
+  radius   Float?
   canvasId String
   canvas   Canva  @relation(fields: [canvasId], references: [id], onDelete: Cascade)
 }

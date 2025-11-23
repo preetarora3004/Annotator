@@ -12,7 +12,8 @@
     "prettier": "^3.6.0",
     "prettier-plugin-tailwindcss": "^0.6.11",
     "roughjs": "^4.6.6",
-    "turbo": "^2.5.8"
+    "turbo": "^2.5.8",
+    "fabric": "^6.7.1"
   },
   "dependencies": {
     "@repo/db": "workspace:*",
