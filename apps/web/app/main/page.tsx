@@ -1,6 +1,6 @@
 "use client"
 
-import { Canvas, PencilBrush, Rect, Circle, Path, TEvent, TPointerEventInfo, Point, FabricObject } from "fabric";
+import { Canvas, PencilBrush, Path, TEvent, TPointerEventInfo, Point, FabricObject, Circle as FabricCircle } from "fabric";
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSession } from "next-auth/react";
 import { useProps } from "@repo/ui/store";
@@ -12,7 +12,7 @@ import { Line } from "@repo/ui/line";
 import { shallow } from "zustand/shallow";
 import { Menu } from '@repo/ui/menu';
 import { useSocket } from "@repo/ui/websocketProvider";
-import { y, WebsocketProvider, IndexeddbPersistence, rs } from '@repo/utils';
+import { y, WebsocketProvider, IndexeddbPersistence, rs, RoughRect, RoughCircle } from '@repo/utils';
 
 export default function Canva() {
 
@@ -27,17 +27,18 @@ export default function Canva() {
     const { tool, activeTool } = useProps((s) => ({ tool: s.tool, activeTool: s.activeTool }), shallow);
     const [active, setActive] = useState("select");
 
+
     const [canvas, setCanvas] = useState<Canvas | null>(null);
     const canvasEl = useRef<HTMLCanvasElement>(null);
     const rc = useRef<ReturnType<typeof rs.canvas> | null>(null);
 
     const isDrawingShape = useRef(false);
     const startPoint = useRef({ x: 0, y: 0 });
-    const activeShape = useRef<Rect | Circle | null>(null);
-    const previewShapes = useRef<Map<string, Rect | Circle>>(new Map());
+    const activeShape = useRef<RoughRect | RoughCircle | null>(null);
+    const previewShapes = useRef<Map<string, RoughRect | RoughCircle>>(new Map());
     const { socket, send } = useSocket();
     const [cursors, setCursors] = useState<Map<number, { x: number, y: number, name: string, color: string }>>(new Map());
-    const cursorObjects = useRef<Map<number, Circle>>(new Map());
+    const cursorObjects = useRef<Map<number, FabricCircle>>(new Map());
 
     const { doc, provider, objects, awareness, indexDb } = useMemo(() => {
 
@@ -174,7 +175,7 @@ export default function Canva() {
 
                 if (!cursorObj) {
 
-                    cursorObj = new Circle({
+                    cursorObj = new FabricCircle({
                         left: cursorData.x,
                         top: cursorData.y,
                         radius: 8,
@@ -249,8 +250,8 @@ export default function Canva() {
             ry: 20,
         };
         const shape = tool === 'rectangle'
-            ? new Rect({ ...shapeOptions, width: 0, height: 0 })
-            : new Circle({ ...shapeOptions, radius: 0 });
+            ? new RoughRect({ ...shapeOptions, width: 0, height: 0 })
+            : new RoughCircle({ ...shapeOptions, radius: 0 });
 
         const shapeId = Date.now().toString() + Math.random().toString(36).substring(2, 11);
         shape.set('id', shapeId);
@@ -280,7 +281,7 @@ export default function Canva() {
         const pointer = canvas.getScenePoint(o.e);
 
         if (activeShape.current.type === 'rect') {
-            const rect = activeShape.current as Rect;
+            const rect = activeShape.current as RoughRect;
             if (startPoint.current.x > pointer.x) rect.set({ left: pointer.x });
             if (startPoint.current.y > pointer.y) rect.set({ top: pointer.y });
             rect.set({
@@ -304,7 +305,7 @@ export default function Canva() {
         }
 
         if (activeShape.current.type === 'circle') {
-            const circle = activeShape.current as Circle;
+            const circle = activeShape.current as RoughCircle;
             circle.set({
                 left: Math.min(pointer.x, startPoint.current.x),
                 top: Math.min(pointer.y, startPoint.current.y),
@@ -348,13 +349,13 @@ export default function Canva() {
             newYObjects.set("fill", shape.fill || 'transparent');
 
             if (shape.type === 'rect') {
-                newYObjects.set("width", (shape as Rect).width);
-                newYObjects.set("height", (shape as Rect).height);
-                newYObjects.set("rx", (shape as Rect).rx || 20);
-                newYObjects.set("ry", (shape as Rect).ry || 20);
+                newYObjects.set("width", (shape as RoughRect).width);
+                newYObjects.set("height", (shape as RoughRect).height);
+                newYObjects.set("rx", (shape as RoughRect).rx || 20);
+                newYObjects.set("ry", (shape as RoughRect).ry || 20);
             }
             else if (shape.type === 'circle') {
-                newYObjects.set("radius", (shape as Circle).radius || 0);
+                newYObjects.set("radius", (shape as RoughCircle).radius || 0);
             }
 
             objects.push([newYObjects]);
@@ -383,10 +384,10 @@ export default function Canva() {
                     let fabricObjData: FabricObject | null = null;
 
                     if (objData.type === "rect") {
-                        fabricObjData = new Rect(objData);
+                        fabricObjData = new RoughRect(objData);
                     }
                     else if (objData.type === "circle") {
-                        fabricObjData = new Circle(objData);
+                        fabricObjData = new RoughCircle(objData);
                     }
 
                     if (fabricObjData) {
@@ -436,7 +437,7 @@ export default function Canva() {
                         payload.width = obj.width || 0;
                         payload.height = obj.height || 0;
                     } else if (obj.type === 'circle') {
-                        payload.radius = (obj as Circle).radius || 0;
+                        payload.radius = (obj as RoughCircle).radius || 0;
                     }
 
                     send("object:modified", payload);
@@ -539,7 +540,7 @@ export default function Canva() {
                 if (data.action === "object:added") {
                     const payload = data.payload;
                     if (payload.type === 'rect') {
-                        const rect = new Rect({
+                        const rect = new RoughRect({
                             left: payload.left,
                             top: payload.top,
                             width: payload.width,
@@ -555,7 +556,7 @@ export default function Canva() {
                         if (payload.id) rect.set('id', payload.id);
                         canvas.add(rect);
                     } else if (payload.type === 'circle') {
-                        const circle = new Circle({
+                        const circle = new RoughCircle({
                             left: payload.left,
                             top: payload.top,
                             radius: payload.radius,
@@ -605,10 +606,10 @@ export default function Canva() {
                     }
                 } else if (data.action === "preview:start") {
                     const payload = data.payload;
-                    let previewShape: Rect | Circle;
+                    let previewShape: RoughRect | RoughCircle;
 
                     if (payload.type === 'rect') {
-                        previewShape = new Rect({
+                        previewShape = new RoughRect({
                             left: payload.left,
                             top: payload.top,
                             width: payload.width,
@@ -622,7 +623,7 @@ export default function Canva() {
                             ry: payload.ry,
                         });
                     } else if (payload.type === 'circle') {
-                        previewShape = new Circle({
+                        previewShape = new RoughCircle({
                             left: payload.left,
                             top: payload.top,
                             radius: payload.radius,
@@ -648,14 +649,14 @@ export default function Canva() {
 
                     if (existingPreview) {
                         if (payload.type === 'rect') {
-                            (existingPreview as Rect).set({
+                            (existingPreview as RoughRect).set({
                                 left: payload.left,
                                 top: payload.top,
                                 width: payload.width,
                                 height: payload.height,
                             });
                         } else if (payload.type === 'circle') {
-                            (existingPreview as Circle).set({
+                            (existingPreview as RoughCircle).set({
                                 left: payload.left,
                                 top: payload.top,
                                 radius: payload.radius,
