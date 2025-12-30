@@ -39,3 +39,4 @@ apps/web/.env
 #websocket
 websocket/.env
 .env
+.env
