@@ -9,19 +9,23 @@
     "format": "prettier --write \"**/*.{ts,tsx,md}\""
   },
   "devDependencies": {
+    "fabric": "^6.7.1",
     "prettier": "^3.6.0",
     "prettier-plugin-tailwindcss": "^0.6.11",
+    "prisma": "^7.1.0",
     "roughjs": "^4.6.6",
-    "turbo": "^2.5.8",
-    "fabric": "^6.7.1"
+    "turbo": "^2.5.8"
   },
   "dependencies": {
+    "@prisma/client": "^7.1.0",
     "@repo/db": "workspace:*",
     "@repo/ui": "workspace:*",
     "@repo/utils": "workspace:*",
+    "next": "15.5.5",
     "next-auth": "^4.24.11",
     "y-websocket": "^3.0.0",
-    "yjs": "^13.6.27"
+    "yjs": "^13.6.27",
+    "@prisma/adapter-pg": "^7.1.0"
   },
   "packageManager": "pnpm@8.15.6",
   "engines": {

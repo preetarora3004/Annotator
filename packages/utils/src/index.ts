@@ -1,5 +1,1 @@
 export * from './authOption'
-export * from './y'
-export * from './rough'
-export * from './shapes'
-export * from './roughFabric'

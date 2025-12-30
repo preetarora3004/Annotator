@@ -1,13 +1,18 @@
 {
   // Visit https://aka.ms/tsconfig to read more about this file
   "compilerOptions": {
-    
+    // File Layout
+    "rootDir": "./src",
     "outDir": "./dist",
 
-    "module": "ESNext",
+    // Environment Settings
+    // See also https://aka.ms/tsconfig/module
+    "module": "esnext",
     "target": "ES2020",
-    "moduleResolution" : "Node",
-    
+    "moduleResolution" : "bundler",
+    "types": [],
+
+    // Other Outputs
     "sourceMap": true,
     "declaration": true,
     "declarationMap": true,
@@ -15,14 +20,13 @@
     // Stricter Typechecking Options
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
-    "esModuleInterop" : true,
 
+    // Recommended Options
     "strict": true,
-    "verbatimModuleSyntax": true,
+    "esModuleInterop" : true,
     "isolatedModules": true,
     "noUncheckedSideEffectImports": true,
     "moduleDetection": "force",
     "skipLibCheck": true,
   },
-  "include" : ["index.ts", "next.ts", "../types/**/*.d.ts", "./prisma/generated"]
 }

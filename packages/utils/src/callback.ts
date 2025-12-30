@@ -1,4 +1,4 @@
-import { CallbacksOptions } from "next-auth";
+import { CallbacksOptions, User } from "next-auth";
 import { JWT } from "next-auth/jwt";
 
 export const callbacks: Partial<CallbacksOptions> = {

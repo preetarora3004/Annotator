@@ -12,7 +12,7 @@ import { Line } from "@repo/ui/line";
 import { shallow } from "zustand/shallow";
 import { Menu } from '@repo/ui/menu';
 import { useSocket } from "@repo/ui/websocketProvider";
-import { y, WebsocketProvider, IndexeddbPersistence, rs, RoughRect, RoughCircle } from '@repo/utils';
+import { y, WebsocketProvider, IndexeddbPersistence, rs, RoughRect, RoughCircle } from '@repo/utils-client';
 
 export default function Canva() {
 
@@ -24,9 +24,8 @@ export default function Canva() {
         }
     }, [status]);
 
-    const { tool, activeTool } = useProps((s) => ({ tool: s.tool, activeTool: s.activeTool }), shallow);
+    const { tool, activeTool, color, strokeCurr, toolsetter } = useProps((s) => ({ tool: s.tool, activeTool: s.activeTool, color : s.color, strokeCurr : s.stroke, toolsetter : s.toolSetter }), shallow);
     const [active, setActive] = useState("select");
-
 
     const [canvas, setCanvas] = useState<Canvas | null>(null);
     const canvasEl = useRef<HTMLCanvasElement>(null);
@@ -67,7 +66,7 @@ export default function Canva() {
         const fabricCanvas = new Canvas(canvasEl.current, {
             width: window.innerWidth,
             height: window.innerHeight,
-            backgroundColor: '#FFFFFF',
+            backgroundColor: '#161718',
             skipOffscreen: true,
         });
         setCanvas(fabricCanvas);
@@ -85,6 +84,7 @@ export default function Canva() {
 
     useEffect(() => {
         setActive(activeTool)
+
     }, [activeTool])
 
     const onMouseScroll = useCallback((o: TPointerEventInfo<WheelEvent>) => {
@@ -178,10 +178,10 @@ export default function Canva() {
                     cursorObj = new FabricCircle({
                         left: cursorData.x,
                         top: cursorData.y,
-                        radius: 8,
+                        radius: 2,
                         fill: cursorData.color,
-                        stroke: '#ffffff',
-                        strokeWidth: 2,
+                        stroke: '#D3D3D3',
+                        strokeWidth: strokeCurr,
                         selectable: false,
                         evented: false,
                         hasControls: false,
@@ -241,14 +241,20 @@ export default function Canva() {
         const pointer = canvas.getScenePoint(o.e);
         startPoint.current = { x: pointer.x, y: pointer.y };
 
-        const shapeOptions = {
+        const shapeOptions = tool === 'rectangle' ? {
             left: startPoint.current.x, top: startPoint.current.y,
-            stroke: 'black', strokeWidth: 2, fill: 'transparent',
+            stroke: color, strokeWidth: strokeCurr, fill: 'transparent',
             selectable: false,
             hasControls: false,
             rx: 20,
             ry: 20,
-        };
+        } :
+            {
+                left: startPoint.current.x, top: startPoint.current.y,
+                stroke: color, strokeWidth: strokeCurr, fill: 'transparent',
+                selectable: false,
+                hasControls: false
+            };
         const shape = tool === 'rectangle'
             ? new RoughRect({ ...shapeOptions, width: 0, height: 0 })
             : new RoughCircle({ ...shapeOptions, radius: 0 });
@@ -267,7 +273,7 @@ export default function Canva() {
             width: shape.width || 0,
             height: shape.height || 0,
             radius: tool === 'circle' ? 0 : undefined,
-            stroke: shape.stroke || 'black',
+            stroke: shape.stroke || 'white',
             strokeWidth: shape.strokeWidth || 2,
             fill: shape.fill || 'transparent',
             id: shapeId,
@@ -295,7 +301,7 @@ export default function Canva() {
                 top: rect.top || 0,
                 width: rect.width || 0,
                 height: rect.height || 0,
-                stroke: rect.stroke || 'black',
+                stroke: rect.stroke || 'white',
                 strokeWidth: rect.strokeWidth || 2,
                 fill: rect.fill || 'transparent',
                 rx: rect.rx || 20,
@@ -317,7 +323,7 @@ export default function Canva() {
                 left: circle.left || 0,
                 top: circle.top || 0,
                 radius: circle.radius || 0,
-                stroke: circle.stroke || 'black',
+                stroke: circle.stroke || 'white',
                 strokeWidth: circle.strokeWidth || 2,
                 fill: circle.fill || 'transparent',
                 id: circle.get('id')
@@ -344,7 +350,7 @@ export default function Canva() {
             newYObjects.set("id", shape.get("id"));
             newYObjects.set("left", shape.left);
             newYObjects.set("top", shape.top);
-            newYObjects.set("stroke", shape.stroke || 'black');
+            newYObjects.set("stroke", color || 'white');
             newYObjects.set("strokeWidth", shape.strokeWidth || 2);
             newYObjects.set("fill", shape.fill || 'transparent');
 
@@ -367,7 +373,8 @@ export default function Canva() {
 
         isDrawingShape.current = false;
         activeShape.current = null;
-
+        toolsetter("none");
+        
     }, [canvas, doc, objects, send]);
 
     useEffect(() => {
@@ -386,7 +393,7 @@ export default function Canva() {
                     if (objData.type === "rect") {
                         fabricObjData = new RoughRect(objData);
                     }
-                    else if (objData.type === "circle") {
+                    else if (objData.type === "circle") { 
                         fabricObjData = new RoughCircle(objData);
                     }
 
@@ -425,7 +432,7 @@ export default function Canva() {
                         type: obj.type,
                         left: obj.left || 0,
                         top: obj.top || 0,
-                        stroke: obj.stroke || 'black',
+                        stroke: obj.stroke || 'white',
                         strokeWidth: obj.strokeWidth || 2,
                         fill: obj.fill || 'transparent',
                         selectable: true,
@@ -479,7 +486,7 @@ export default function Canva() {
                 canvas.freeDrawingBrush = new PencilBrush(canvas);
                 const brush = canvas.freeDrawingBrush;
                 brush.width = 3;
-                brush.color = '#000000';
+                brush.color = '#FFFFFF';
                 canvas.freeDrawingCursor = 'crosshair';
 
                 canvas.on('path:created', (e) => {
@@ -492,7 +499,7 @@ export default function Canva() {
                                 type: 'path',
                                 left: path.left || 0,
                                 top: path.top || 0,
-                                stroke: path.stroke || 'black',
+                                stroke: path.stroke || 'white',
                                 strokeWidth: path.strokeWidth || 3,
                                 fill: path.fill || 'transparent',
                                 selectable: true,
@@ -523,9 +530,8 @@ export default function Canva() {
         }
 
         return () => {
-            if (canvas) {
-
-            }
+            activeShape.current = null;
+            console.log("Hey");
         };
     }, [tool, canvas, onMouseDown, onMouseMove, onMouseUp]);
 
@@ -702,9 +708,9 @@ export default function Canva() {
     }, [canvas]);
 
     return (
-        <div className="relative w-screen h-screen">
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 p-0.5 bg-white border-1 border-[#E6E6E6] rounded-lg flex shadow-sm gap-2 px-1">
-                <div className="grid grid-cols-5 items-center gap-1.5 px-1 ">
+        <div className="relative w-screen h-screen bg-[#161718]">
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 p-0.5 bg-menu border-1 border-[#232329] rounded-lg flex shadow-sm gap-2 px-1">
+                <div className="grid grid-cols-5 items-center gap-1.5 px-1 text-white">
                     <Pencil />
                     <Rectangle />
                     <Circles />

@@ -16,7 +16,7 @@ export const authOption: NextAuthOptions = {
     },
 
     jwt: {
-        encode: async ({ token, secret, maxAge }): Promise<string> => {
+        encode: async ({ token, secret }): Promise<string> => {
 
             const fullToken = {
                 sub: token?.sub!,

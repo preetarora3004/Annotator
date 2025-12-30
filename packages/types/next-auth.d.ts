@@ -15,6 +15,12 @@ declare module "next-auth" {
     username : string;
     token : string;
   }
+
+  interface AdapterUser extends User{
+    id: string;
+    username: string;
+    token: string;
+  }
 }
 
 declare module "next-auth/jwt" {

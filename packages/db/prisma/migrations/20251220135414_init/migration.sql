@@ -17,8 +17,25 @@ CREATE TABLE "Canva" (
     CONSTRAINT "Canva_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "Shapes" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "startX" DOUBLE PRECISION NOT NULL,
+    "startY" DOUBLE PRECISION NOT NULL,
+    "width" DOUBLE PRECISION,
+    "height" DOUBLE PRECISION,
+    "radius" DOUBLE PRECISION,
+    "canvasId" TEXT NOT NULL,
+
+    CONSTRAINT "Shapes_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "User_username_key" ON "User"("username");
 
 -- AddForeignKey
 ALTER TABLE "Canva" ADD CONSTRAINT "Canva_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Shapes" ADD CONSTRAINT "Shapes_canvasId_fkey" FOREIGN KEY ("canvasId") REFERENCES "Canva"("id") ON DELETE CASCADE ON UPDATE CASCADE;
