@@ -24,7 +24,7 @@ export default function Canva() {
         }
     }, [status]);
 
-    const { tool, activeTool, color, strokeCurr, toolsetter } = useProps((s) => ({ tool: s.tool, activeTool: s.activeTool, color : s.color, strokeCurr : s.stroke, toolsetter : s.toolSetter }), shallow);
+    const { tool, activeTool, strokeColor, strokeCurr, toolsetter, activeColor } = useProps((s) => ({ tool: s.tool, activeTool: s.activeTool, strokeColor : s.activeStrokeColor, strokeCurr : s.stroke, toolsetter : s.toolSetter, activeColor : s.activeColor }), shallow);
     const [active, setActive] = useState("select");
 
     const [canvas, setCanvas] = useState<Canvas | null>(null);
@@ -236,14 +236,14 @@ export default function Canva() {
     }, [canvas, awareness, data])
 
     const onMouseDown = useCallback((o: TEvent) => {
-        if (!canvas) return;
+        if (!canvas || !tool) return;
         isDrawingShape.current = true;
         const pointer = canvas.getScenePoint(o.e);
         startPoint.current = { x: pointer.x, y: pointer.y };
 
         const shapeOptions = tool === 'rectangle' ? {
             left: startPoint.current.x, top: startPoint.current.y,
-            stroke: color, strokeWidth: strokeCurr, fill: 'transparent',
+            stroke: strokeColor, strokeWidth: strokeCurr, fill: activeColor,
             selectable: false,
             hasControls: false,
             rx: 20,
@@ -251,7 +251,7 @@ export default function Canva() {
         } :
             {
                 left: startPoint.current.x, top: startPoint.current.y,
-                stroke: color, strokeWidth: strokeCurr, fill: 'transparent',
+                stroke: strokeColor, strokeWidth: strokeCurr, fill: activeColor,
                 selectable: false,
                 hasControls: false
             };
@@ -271,7 +271,7 @@ export default function Canva() {
             left: shape.left || 0,
             top: shape.top || 0,
             width: shape.width || 0,
-            height: shape.height || 0,
+            height: shape.height || 0, 
             radius: tool === 'circle' ? 0 : undefined,
             stroke: shape.stroke || 'white',
             strokeWidth: shape.strokeWidth || 2,
@@ -350,7 +350,7 @@ export default function Canva() {
             newYObjects.set("id", shape.get("id"));
             newYObjects.set("left", shape.left);
             newYObjects.set("top", shape.top);
-            newYObjects.set("stroke", color || 'white');
+            newYObjects.set("stroke", strokeColor || 'white');
             newYObjects.set("strokeWidth", shape.strokeWidth || 2);
             newYObjects.set("fill", shape.fill || 'transparent');
 
